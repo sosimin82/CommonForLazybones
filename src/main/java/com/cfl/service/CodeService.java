@@ -58,6 +58,11 @@ public class CodeService{
             // fullIdPath last element = codeId
             code.setCodeId(fullIdPath.get(fullIdPath.size() - 1));
             code.setMultiLanguageCode(UUID.randomUUID().toString());
+            
+            // 다국어를 사용하지 않는 코드의 경우 다국어중 한국어(ko)만 기본으로 하여 다국어 맵 생성
+            if (code.getMultiLanguageMap() == null) {
+            	code.setMultiLanguageMap(this.createDefaultMultiLanguageCode(code.getCodeName()));
+            }
 
             if (isExistCode(code, fullIdPath)) {
                 apiResponse = ApiResponseUtil.getDuplicateCreationApiResponse();
@@ -81,7 +86,7 @@ public class CodeService{
                     } else {
                         codeMapper.insertCode(code);
                         codeMapper.insertCodeMultiLanguage(code.getMultiLanguageCode(), code.getMultiLanguageMap());
-                        mappingService.createCodeSequenceAndSubCodeSequenceMapping(highLevelCodeSequence, code.getCodeSequence(), treeId, getCodeDepth(code, highLevelFullDepth));
+                        mappingService.createCodeSequenceAndSubCodeSequenceMapping(highLevelCodeSequence, code.getCodeSequence(), treeId, getCodeDepth(highLevelFullDepth));
                         networkService.sendProvideServersToInit("cfl", new CacheUpdateRequest(serviceName, tenantId, "code"));
                         apiResponse = ApiResponseUtil.getSuccessApiResponse(code);
                     }
@@ -103,12 +108,7 @@ public class CodeService{
         String subCodeFullIdPath = MapUtils.getString(codePath, "subCodeFullIdPath");
         boolean isRoot = MapUtils.getBoolean(codePath, "isRoot");
 
-        long rootCodeSequence;
-        if (isRoot) {
-            rootCodeSequence = getCodeSequenceFromCache(code, codeFullIdPath);
-        } else {
-            rootCodeSequence = getCodeSequenceFromCache(code, getRootFullDepth(codeFullIdPath));
-        }
+        long rootCodeSequence = getRootCodeSequence(isRoot, code, codeFullIdPath);
         String treeId = Constant.TREE_ID_PREFIX + rootCodeSequence;
 
         String[] subCodeFullIdPathArray = subCodeFullIdPath.split(":");
@@ -121,12 +121,13 @@ public class CodeService{
             long codeSequence = getCodeSequenceFromCache(code, codeFullIdPath);
             long subCodeSequence = getCodeSequenceFromCache(code, subCodeFullIdPath);
 
-            if (isRoot) {
-               codeMapper.insertCodeTree(treeId, rootCodeSequence);
+            if (isRoot && codeMapper.selectCodeTree(treeId, rootCodeSequence) == 0) {
+           		codeMapper.insertCodeTree(treeId, rootCodeSequence);
             }
 
             try {
-                mappingService.createCodeSequenceAndSubCodeSequenceMapping(codeSequence, subCodeSequence, treeId, getCodeDepth(code, codeFullIdPath));
+            	int depth = getDepthByRoot(isRoot, codeFullIdPath);
+                mappingService.createCodeSequenceAndSubCodeSequenceMapping(codeSequence, subCodeSequence, treeId, depth);
                 apiResponse = ApiResponseUtil.getSuccessApiResponse(code);
 
             } catch (Exception e) {
@@ -138,7 +139,50 @@ public class CodeService{
         historyService.createHistory(serviceName, tenantId, code, apiResponse);
         return apiResponse;
     }
-
+    
+    public ApiResponse removeCodeMapping(String serviceName, String tenantId, Map<String, Object> codePath) {
+        ApiResponse apiResponse;
+        Code code = new Code(serviceName, tenantId);
+        String codeFullIdPath = MapUtils.getString(codePath, "codeFullIdPath");
+        String subCodeFullIdPath = MapUtils.getString(codePath, "subCodeFullIdPath");
+        boolean isRoot = MapUtils.getBoolean(codePath, "isRoot");
+        
+        long rootCodeSequence = getRootCodeSequence(isRoot, code, codeFullIdPath);
+        String treeId = Constant.TREE_ID_PREFIX + rootCodeSequence;
+        
+        long codeSequence = getCodeSequenceFromCache(code, codeFullIdPath);
+        long subCodeSequence = getCodeSequenceFromCache(code, subCodeFullIdPath);
+        try {
+        	int depth = getDepthByRoot(isRoot, codeFullIdPath);
+            mappingService.removeCodeSequenceAndSubCodeSequenceMapping(codeSequence, subCodeSequence, treeId, depth);
+            apiResponse = ApiResponseUtil.getSuccessApiResponse(code);
+        } catch (Exception e) {
+            log.error("createCodeMapping fail", e);
+            apiResponse = ApiResponseUtil.getFailureApiResponse();
+        }
+    	
+    	return apiResponse;
+    }
+    
+    private long getRootCodeSequence(boolean isRoot, Code code, String codeFullIdPath) {
+        long rootCodeSequence;
+        if (isRoot) {
+            rootCodeSequence = getCodeSequenceFromCache(code, codeFullIdPath);
+        } else {
+            rootCodeSequence = getCodeSequenceFromCache(code, getRootFullDepth(codeFullIdPath));
+        }
+    	return rootCodeSequence;
+    }
+    
+    
+    private int getDepthByRoot(boolean isRoot, String codeFullIdPath) {
+    	int depth = 1;
+    	if (!isRoot) {
+    		depth = getCodeDepth(codeFullIdPath);
+    	}
+    	return depth;
+    }
+    
     public ApiResponse modifyCode(String serviceName, String tenantId, List<String> fullIdPath, Code code) {
         ApiResponse apiResponse;
 
@@ -152,12 +196,16 @@ public class CodeService{
             if (codeFromCache == null) {
                 apiResponse = ApiResponseUtil.getMissingValueApiResponse();
             } else {
+            	// 코드 시퀀스와 다국어 코드 값은 기존에 등록된 다국어 코드 값을 활용
                 code.setCodeSequence(codeFromCache.getCodeSequence());
-
-                // 다국어 정보의 경우 기존 데이터를 지우고 새로 생성한다.
+                code.setMultiLanguageCode(codeFromCache.getMultiLanguageCode());
                 codeMapper.updateCode(code);
-                codeMapper.deleteCodeMultiLanguage(code.getMultiLanguageCode());
-                codeMapper.insertCodeMultiLanguage(code.getMultiLanguageCode(), code.getMultiLanguageMap());
+                
+                if (code.getMultiLanguageMap() != null) {
+                	// 다국어 정보의 경우 기존 데이터를 지우고 새로 생성한다.
+                	codeMapper.deleteCodeMultiLanguage(code.getMultiLanguageCode());
+                	codeMapper.insertCodeMultiLanguage(code.getMultiLanguageCode(), code.getMultiLanguageMap());
+                }
 
                 networkService.sendProvideServersToInit("cfl", new CacheUpdateRequest(serviceName, tenantId , "code"));
                 apiResponse = ApiResponseUtil.getSuccessApiResponse(code);
@@ -363,7 +411,7 @@ public class CodeService{
         return codeFromCache.getCodeSequence();
     }
 
-    private int getCodeDepth(Code code, String getFullDepth) {
+    private int getCodeDepth(String getFullDepth) {
         return getFullDepth.split(":").length;
     }
 
@@ -385,5 +433,11 @@ public class CodeService{
         }
 
         return tenantMapFromCache.get(getFullDepth);
+    }
+    
+    private Map<String, String> createDefaultMultiLanguageCode(String codeName) {
+    	Map<String, String> multiLanguageMap = new HashMap<String, String>();
+    	multiLanguageMap.put("ko", codeName);
+    	return multiLanguageMap;
     }
 }

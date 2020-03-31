@@ -71,6 +71,10 @@ public class MappingService {
     public void createCodeSequenceAndSubCodeSequenceMapping(Long codeSequence, Long subCodeSequence, String treeId, int depth) {
         mappingMapper.insertCodeSequenceAndSubCodeSequenceMapping(codeSequence, subCodeSequence, treeId, depth);
     }
+    
+    public void removeCodeSequenceAndSubCodeSequenceMapping(Long codeSequence, Long subCodeSequence, String treeId, int depth) {
+    	mappingMapper.deleteCodeSequenceAndSubCodeSequenceMapping(codeSequence, subCodeSequence, treeId, depth);
+    }
 
     public List<Code> getTopLevelCodes(String serviceName, String tenantId) {
         return mappingMapper.selectTopLevelCodes(serviceName, tenantId);

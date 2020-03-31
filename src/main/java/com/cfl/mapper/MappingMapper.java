@@ -32,6 +32,7 @@ public interface MappingMapper {
     List<Authority> selectUserAuthorities(@Param("user") User user);
 
     void insertCodeSequenceAndSubCodeSequenceMapping(Long codeSequence, Long subCodeSequence, String treeId, int depth);
+    void deleteCodeSequenceAndSubCodeSequenceMapping(Long codeSequence, Long subCodeSequence, String treeId, int depth);
     List<Code> selectTopLevelCodes(String serviceName, String tenantId);
     List<Code> selectUsingTopLevelCodes(String serviceName, String tenantId);
     List<Code> selectLowLevelCodes(Code highLevelCode, int depth);

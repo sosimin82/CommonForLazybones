@@ -12,6 +12,7 @@ public interface CodeMapper {
     void insertCode(@Param("code") Code code);
     void insertCodeMultiLanguage(@Param("multiLanguageCode")  String multiLanguageCode, @Param("multiLanguageMap")  Map<String, String> multiLanguageMap);
     void insertCodeTree(String treeId, Long rootCodeSequence);
+    int selectCodeTree(String treeId, Long rootCodeSequence);
 
     void updateCode(@Param("code") Code code);
 

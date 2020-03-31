@@ -32,6 +32,13 @@ public class CodeController {
                                          @RequestBody Map<String, Object> codePath) {
         return codeService.createCodeMapping(serviceName, tenantId, codePath);
     }
+    
+    @DeleteMapping(value = {"/{serviceName}/{tenantId}/code/mapping", "/{serviceName}/code/mapping"})
+    public ApiResponse removeCodeMapping(@PathVariable("serviceName") String serviceName,
+    		@PathVariable(name = "tenantId", required = false) String tenantId,
+    		@RequestBody Map<String, Object> codePath) {
+    	return codeService.removeCodeMapping(serviceName, tenantId, codePath);
+    }
 
     @PutMapping(value = {CODE_URL_WITH_TENANT, CODE_URL_WITHOUT_TENANT})
     public ApiResponse modifyCode(@PathVariable("serviceName") String serviceName,

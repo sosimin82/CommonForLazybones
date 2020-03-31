@@ -368,6 +368,15 @@
             )
 
     </insert>
+    
+    <delete id="deleteCodeSequenceAndSubCodeSequenceMapping">
+        DELETE FROM 
+           cfl_code_subcode_mapping
+         WHERE cd_seq = #{codeSequence}
+           AND sub_cd_seq =  #{subCodeSequence}
+           AND depth = #{depth}
+           AND tre_id = #{treeId}
+    </delete>
 
     <select id="selectTopLevelCodes" resultMap="Code">
         SELECT

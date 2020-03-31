@@ -47,6 +47,14 @@
         VALUES
             (#{treeId}, #{rootCodeSequence})
     </insert>
+    
+    <select id="selectCodeTree" resultType="int">
+        SELECT 
+               count(1) AS cnt
+          FROM cfl_code_tree
+         WHERE tre_id = #{treeId}
+           AND root_cd_seq = #{rootCodeSequence}
+    </select>
 
     <update id="updateCode">
         UPDATE
